@@ -1,0 +1,331 @@
+<!doctype html>
+<html ng-app="hospitalApp">
+<head>
+  <meta charset="utf-8"/>
+  <title>Hospital Appointment System</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <!-- Bootstrap for quick layout -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <!-- AngularJS 1.8 -->
+  <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.8.3/angular.min.js"></script>
+
+  <style>
+    body { padding-top: 40px; background: #f7f9fc; }
+    .card { border-radius: 12px; box-shadow: 0 6px 18px rgba(0,0,0,0.06); }
+    .pointer { cursor: pointer; }
+    .small-muted { font-size: 0.9rem; color: #6c757d; }
+  </style>
+</head>
+<body ng-controller="MainCtrl as vm">
+
+<div class="container">
+  <div class="row mb-3">
+    <div class="col-md-8">
+      <h3>Hospital Appointment System</h3>
+      <p class="small-muted">Book appointments, view your bookings, and check doctor availability.</p>
+    </div>
+    <div class="col-md-4 text-right">
+      <div ng-if="!vm.currentUser">
+        <button class="btn btn-outline-primary btn-sm" ng-click="vm.showLogin = !vm.showLogin">Login</button>
+        <button class="btn btn-primary btn-sm" ng-click="vm.showRegister = !vm.showRegister">Register</button>
+      </div>
+      <div ng-if="vm.currentUser">
+        <span class="mr-2">Hello, <strong>{{vm.currentUser.name}}</strong></span>
+        <button class="btn btn-danger btn-sm" ng-click="vm.logout()">Logout</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOGIN / REGISTER -->
+  <div class="row">
+    <div class="col-md-6" ng-show="vm.showLogin">
+      <div class="card p-3">
+        <h5>Patient Login</h5>
+        <form ng-submit="vm.login()">
+          <div class="form-group">
+            <label>Email</label>
+            <input type="email" class="form-control" ng-model="vm.loginData.email" required>
+          </div>
+          <div class="form-group">
+            <label>Password</label>
+            <input type="password" class="form-control" ng-model="vm.loginData.password" required>
+          </div>
+          <div class="text-right">
+            <button class="btn btn-primary">Login</button>
+          </div>
+          <div class="text-danger mt-2" ng-if="vm.loginError">{{vm.loginError}}</div>
+        </form>
+      </div>
+    </div>
+
+    <div class="col-md-6" ng-show="vm.showRegister">
+      <div class="card p-3">
+        <h5>Patient Registration</h5>
+        <form ng-submit="vm.register()">
+          <div class="form-group">
+            <label>Full Name</label>
+            <input type="text" class="form-control" ng-model="vm.regData.name" required>
+          </div>
+          <div class="form-group">
+            <label>Phone</label>
+            <input type="tel" class="form-control" ng-model="vm.regData.phone" required>
+          </div>
+          <div class="form-group">
+            <label>Email</label>
+            <input type="email" class="form-control" ng-model="vm.regData.email" required>
+          </div>
+          <div class="form-group">
+            <label>Password</label>
+            <input type="password" class="form-control" ng-model="vm.regData.password" required minlength="6">
+          </div>
+          <div class="text-right">
+            <button class="btn btn-success">Register</button>
+          </div>
+          <div class="text-success mt-2" ng-if="vm.regSuccess">{{vm.regSuccess}}</div>
+          <div class="text-danger mt-2" ng-if="vm.regError">{{vm.regError}}</div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN DASHBOARD -->
+  <div class="row mt-4" ng-if="vm.currentUser">
+    <!-- Left: Book Appointment -->
+    <div class="col-md-6">
+      <div class="card p-3 mb-3">
+        <h5>Book an Appointment</h5>
+        <form ng-submit="vm.bookAppointment()">
+          <div class="form-group">
+            <label>Choose Doctor</label>
+            <select class="form-control" ng-model="vm.appt.doctor_id" ng-options="d.id as (d.name + ' — ' + d.specialty) for d in vm.doctors" required>
+              <option value="">-- Select doctor --</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <div class="form-group col-md-6">
+              <label>Date</label>
+              <input type="date" class="form-control" ng-model="vm.appt.date" required>
+            </div>
+            <div class="form-group col-md-6">
+              <label>Time</label>
+              <input type="time" class="form-control" ng-model="vm.appt.time" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Reason / Notes</label>
+            <textarea class="form-control" ng-model="vm.appt.reason" rows="2"></textarea>
+          </div>
+          <div class="text-right">
+            <button class="btn btn-primary">Book</button>
+          </div>
+          <div class="mt-2">
+            <span class="text-success" ng-if="vm.apptSuccess">{{vm.apptSuccess}}</span>
+            <span class="text-danger" ng-if="vm.apptError">{{vm.apptError}}</span>
+          </div>
+        </form>
+      </div>
+
+      <!-- My Appointments -->
+      <div class="card p-3">
+        <h5>My Appointments</h5>
+        <div ng-if="vm.loadingAppointments" class="small-muted">Loading...</div>
+        <table class="table table-sm" ng-if="!vm.loadingAppointments && vm.appointments.length">
+          <thead>
+            <tr><th>Doctor</th><th>Date</th><th>Time</th><th>Status</th><th></th></tr>
+          </thead>
+          <tbody>
+            <tr ng-repeat="a in vm.appointments">
+              <td>{{a.doctor_name}}</td>
+              <td>{{a.date}}</td>
+              <td>{{a.time}}</td>
+              <td>{{a.status}}</td>
+              <td><button class="btn btn-sm btn-outline-danger" ng-click="vm.cancelAppointment(a)" ng-disabled="a.status!='Scheduled'">Cancel</button></td>
+            </tr>
+          </tbody>
+        </table>
+        <div ng-if="!vm.loadingAppointments && !vm.appointments.length" class="small-muted">You have no appointments yet.</div>
+      </div>
+    </div>
+
+    <!-- Right: Doctor list & availability -->
+    <div class="col-md-6">
+      <div class="card p-3 mb-3">
+        <h5>Doctors</h5>
+        <div class="row">
+          <div class="col-md-6 mb-2" ng-repeat="d in vm.doctors">
+            <div class="border p-2 rounded h-100">
+              <strong>{{d.name}}</strong>
+              <div class="small-muted">{{d.specialty}}</div>
+              <div class="mt-2 small-muted">Available: {{d.available_from}} - {{d.available_to}}</div>
+              <div class="mt-2">
+                <button class="btn btn-sm btn-outline-primary" ng-click="vm.viewSchedule(d)">View Schedule</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Doctor Schedule modal-like -->
+      <div class="card p-3" ng-if="vm.showScheduleFor">
+        <div class="d-flex justify-content-between">
+          <h5>Schedule — {{vm.showScheduleFor.name}}</h5>
+          <button class="btn btn-sm btn-outline-secondary" ng-click="vm.showScheduleFor=null">Close</button>
+        </div>
+        <div class="mt-2 small-muted">Upcoming appointments for this doctor:</div>
+        <ul class="list-group mt-2">
+          <li class="list-group-item p-2" ng-repeat="s in vm.doctorSchedule">
+            <strong>{{s.date}}</strong> — {{s.time}} <span class="small-muted"> ({{s.patient_name}})</span>
+          </li>
+          <li class="list-group-item" ng-if="!vm.doctorSchedule.length">No scheduled appointments.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Public info when not logged in -->
+  <div class="row" ng-if="!vm.currentUser && !vm.showLogin && !vm.showRegister">
+    <div class="col-md-12">
+      <div class="card p-3">
+        <h5>How to use</h5>
+        <ol>
+          <li>Register as a patient or login.</li>
+          <li>Choose a doctor, pick date & time, and book the appointment.</li>
+          <li>Your appointments will appear in <strong>My Appointments</strong>.</li>
+        </ol>
+        <p class="small-muted">Note: This frontend expects backend APIs (see comments below) for saving users and appointments.</p>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+angular.module('hospitalApp', [])
+  .controller('MainCtrl', ['$http', '$timeout', function($http, $timeout){
+    var vm = this;
+
+    // UI state
+    vm.showLogin = false;
+    vm.showRegister = false;
+    vm.currentUser = null; // store logged in user object after login
+    vm.doctors = [];
+    vm.appointments = [];
+    vm.doctorSchedule = [];
+    vm.showScheduleFor = null;
+
+    // forms
+    vm.loginData = {};
+    vm.regData = {};
+    vm.appt = {};
+
+    // load doctors on start
+    vm.init = function(){
+      // sample GET doctors endpoint
+      $http.get('/api/doctors').then(function(res){
+        vm.doctors = res.data;
+      }, function(){
+        // fallback sample doctors for demo when backend not available
+        vm.doctors = [
+          {id:1, name:'Dr. Priya Sharma', specialty:'Cardiologist', available_from:'09:00', available_to:'15:00'},
+          {id:2, name:'Dr. Arun Kumar', specialty:'General Physician', available_from:'10:00', available_to:'17:00'},
+          {id:3, name:'Dr. Meera Nair', specialty:'Dermatologist', available_from:'11:00', available_to:'16:00'}
+        ];
+      });
+    };
+
+    vm.register = function(){
+      vm.regError = vm.regSuccess = null;
+      if(!vm.regData.email || !vm.regData.password) return;
+      $http.post('/api/patients', vm.regData).then(function(res){
+        vm.regSuccess = 'Registered successfully. Please login.';
+        vm.regData = {};
+        // auto-hide success
+        $timeout(()=> vm.regSuccess = null, 4000);
+      }, function(err){
+        vm.regError = err.data && err.data.message ? err.data.message : 'Registration failed.';
+      });
+    };
+
+    vm.login = function(){
+      vm.loginError = null;
+      $http.post('/api/login', vm.loginData).then(function(res){
+        vm.currentUser = res.data.user;
+        vm.showLogin = vm.showRegister = false;
+        vm.loadAppointments();
+      }, function(err){
+        vm.loginError = err.data && err.data.message ? err.data.message : 'Invalid credentials.';
+      });
+    };
+
+    vm.logout = function(){
+      vm.currentUser = null;
+      vm.appointments = [];
+    };
+
+    vm.bookAppointment = function(){
+      vm.apptSuccess = vm.apptError = null;
+      if(!vm.appt.doctor_id || !vm.appt.date || !vm.appt.time) {
+        vm.apptError = 'Please choose doctor, date and time.';
+        return;
+      }
+      var payload = {
+        patient_id: vm.currentUser.id,
+        doctor_id: vm.appt.doctor_id,
+        date: vm.appt.date,
+        time: vm.appt.time,
+        reason: vm.appt.reason || ''
+      };
+      $http.post('/api/appointments', payload).then(function(res){
+        vm.apptSuccess = 'Appointment scheduled.';
+        vm.appt = {};
+        vm.loadAppointments();
+        $timeout(()=> vm.apptSuccess = null, 3500);
+      }, function(err){
+        vm.apptError = err.data && err.data.message ? err.data.message : 'Booking failed.';
+      });
+    };
+
+    vm.loadAppointments = function(){
+      if(!vm.currentUser) return;
+      vm.loadingAppointments = true;
+      $http.get('/api/patients/' + vm.currentUser.id + '/appointments').then(function(res){
+        vm.appointments = res.data;
+        vm.loadingAppointments = false;
+      }, function(){
+        // fallback demo appointments if backend unavailable
+        vm.appointments = [
+          {id:101, doctor_name:'Dr. Arun Kumar', date:'2025-11-05', time:'10:30', status:'Scheduled'},
+          {id:102, doctor_name:'Dr. Meera Nair', date:'2025-11-20', time:'11:00', status:'Scheduled'}
+        ];
+        vm.loadingAppointments = false;
+      });
+    };
+
+    vm.cancelAppointment = function(a){
+      if(!confirm('Cancel appointment on ' + a.date + ' at ' + a.time + '?')) return;
+      $http.delete('/api/appointments/' + a.id).then(function(){
+        vm.loadAppointments();
+      }, function(){
+        alert('Cancel failed (backend not available). Removing locally for demo.');
+        vm.appointments = vm.appointments.filter(x=> x.id !== a.id);
+      });
+    };
+
+    vm.viewSchedule = function(doctor){
+      vm.showScheduleFor = doctor;
+      // load doctor schedule
+      $http.get('/api/doctors/' + doctor.id + '/appointments').then(function(res){
+        vm.doctorSchedule = res.data;
+      }, function(){
+        vm.doctorSchedule = [
+          {date:'2025-11-05', time:'10:30', patient_name:'Ravi'},
+          {date:'2025-11-05', time:'11:15', patient_name:'Sangeeta'}
+        ];
+      });
+    };
+
+    // init
+    vm.init();
+
+    // For demo: if you want to simulate a logged-in patient, uncomment:
+    // vm.currentUser = {id: 999, name: 'Demo Patient', email:'demo
